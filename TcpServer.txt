@@ -1,0 +1,23 @@
+golang的tcp服务器读取超时断开问题，在设置了c.conn.SetDeadline()超时时间以后，不是说到时间后就会产生回调，
+而是到这个时间以后底层会去读取tcp连接中是否有数据到达，会不间断的读，而不做其他处理。
+也就是说，这个设置超时时间可以理解为是底层异步处理而不进行阻塞读取的一个读取间隔时间，而非传统意义上的超时时间。
+那么，tcp连接的超时时间就需要在tcp的阻塞程序中，进行读取空数据的超时判断。例子如下：
+
+//需要读取的数据大小
+data := make([]byte, 4)
+
+//从conn中读取数据
+_, err := conn.Read(data)
+
+//当bytes为0，表示接受的数据为空，则认为客户端无数据传递，断开连接。
+if BytesToInt(data) == 0 {
+    c.conn.Close()
+}
+
+//字节转换成整形
+func BytesToInt(b []byte) int {
+	bytesBuffer := bytes.NewBuffer(b)
+	var tmp int32
+	binary.Read(bytesBuffer, binary.BigEndian, &tmp)
+	return int(tmp)
+}
